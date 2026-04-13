@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Hand Tracking - Optimized Pink Neon</title>
+    <title>Turbo Neon Pixel - AI Hand Tracking</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 2; }
         #video {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 120px; height: 90px;
-            border: 1px solid #ff2d75; border-radius: 8px;
+            position: absolute; bottom: 15px; right: 15px;
+            width: 100px; height: 75px;
+            border: 1px solid #ff2d75; border-radius: 5px;
             z-index: 1; transform: scaleX(-1); opacity: 0.2;
         }
     </style>
@@ -24,7 +24,7 @@
 
     <script>
         const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d", { alpha: false }); // Optimasi konteks
+        const ctx = canvas.getContext("2d");
         const videoElement = document.getElementById("video");
 
         let width, height, particlesArray = [];
@@ -38,8 +38,8 @@
 
         function createTextPixels() {
             ctx.fillStyle = "white";
-            const fontSize = Math.min(width * 0.12, 110);
-            ctx.font = `bold ${fontSize}px Arial`;
+            const fontSize = Math.min(width * 0.12, 100);
+            ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText("I LOVE YOU", width / 2, height / 2);
@@ -50,47 +50,49 @@
 
         class Particle {
             constructor(x, y) {
-                this.x = width / 2 + (Math.random() - 0.5) * 100;
-                this.y = height / 2 + (Math.random() - 0.5) * 100;
+                this.x = width / 2;
+                this.y = height / 2;
                 this.destX = x;
                 this.destY = y;
                 this.size = 3;
+                // Ledakan awal yang lebih halus
                 this.vx = (Math.random() - 0.5) * 20;
                 this.vy = (Math.random() - 0.5) * 20;
-                this.friction = 0.92;
-                this.spring = 0.06;
             }
 
             update() {
+                // Pergerakan dasar (kembali ke posisi teks)
                 let dx = this.destX - this.x;
                 let dy = this.destY - this.y;
                 
-                this.vx += dx * this.spring;
-                this.vy += dy * this.spring;
-                this.vx *= this.friction;
-                this.vy *= this.friction;
+                this.vx += dx * 0.05;
+                this.vy += dy * 0.05;
+                this.vx *= 0.85; // Friksi
+                this.vy *= 0.85;
 
-                if (handX !== null && handY !== null) {
+                // Interaksi Tangan (Disederhanakan agar ringan)
+                if (handX !== null) {
                     let hx = handX - this.x;
                     let hy = handY - this.y;
-                    let distSq = hx * hx + hy * hy; // Gunakan kuadrat agar lebih cepat
-                    if (distSq < 14400) { // 120 * 120
+                    let distSq = hx * hx + hy * hy;
+                    if (distSq < 10000) { // Jarak interaksi 100px
                         let dist = Math.sqrt(distSq);
-                        let angle = Math.atan2(hy, hx);
-                        let push = (120 - dist) * 0.4;
-                        this.vx -= Math.cos(angle) * push;
-                        this.vy -= Math.sin(angle) * push;
+                        let force = (100 - dist) * 0.6;
+                        this.vx -= (hx / dist) * force;
+                        this.vy -= (hy / dist) * force;
                     }
                 }
+
                 this.x += this.vx;
                 this.y += this.vy;
             }
 
             draw() {
-                // Gambar tanpa shadowBlur berat untuk tiap partikel
+                // Render pixel neon (pink)
                 ctx.fillStyle = "#ff2d75";
                 ctx.fillRect(this.x - 1.5, this.y - 1.5, 3, 3);
-                ctx.fillStyle = "#fff";
+                // Titik putih di tengah agar efek neon terasa
+                ctx.fillStyle = "#ffffff";
                 ctx.fillRect(this.x - 0.5, this.y - 0.5, 1, 1);
             }
         }
@@ -98,8 +100,7 @@
         function init() {
             particlesArray = [];
             const pixelData = createTextPixels();
-            // Density dinaikkan ke 12 agar jumlah partikel berkurang (lebih enteng)
-            const density = 12; 
+            const density = 12; // Jumlah partikel yang pas untuk performa SMK/HP
             for (let y = 0; y < pixelData.height; y += density) {
                 for (let x = 0; x < pixelData.width; x += density) {
                     if (pixelData.data[(y * 4 * pixelData.width) + (x * 4) + 3] > 128) {
@@ -110,11 +111,10 @@
         }
 
         function animate() {
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, width, height);
+            ctx.clearRect(0, 0, width, height);
             
-            // Pindahkan shadowBlur ke level canvas (global) agar lebih ringan
-            ctx.shadowBlur = 8;
+            // Glow global (sekali set untuk semua, biar enteng)
+            ctx.shadowBlur = 10;
             ctx.shadowColor = "#ff2d75";
 
             for (let i = 0; i < particlesArray.length; i++) {
@@ -128,21 +128,22 @@
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
 
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5 });
+        // Mode paling ringan: modelComplexity 0
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const finger = results.multiHandLandmarks[0][8]; 
-                handX = (1 - finger.x) * width;
-                handY = finger.y * height;
+                const landmark = results.multiHandLandmarks[0][8];
+                handX = (1 - landmark.x) * width;
+                handY = landmark.y * height;
             } else {
-                handX = null; handY = null;
+                handX = null;
             }
         });
 
         const camera = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 480, height: 360 // Resolusi kamera lebih kecil agar enteng
+            width: 320, height: 240 // Resolusi deteksi diperkecil agar sangat lancar
         });
 
         camera.start().then(() => {
