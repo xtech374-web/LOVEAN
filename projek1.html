@@ -1,206 +1,204 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Hand Tracking - Neon Cyberpunk</title>
+    <title>Pink Neon Pixel Explosion</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 2; }
-        #video {
-            position: absolute; bottom: 20px; right: 20px;
-            width: 180px; height: 135px;
-            border: 2px solid #00f3ff; border-radius: 10px;
-            z-index: 1; transform: scaleX(-1); opacity: 0.3;
-        }
-        .status {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            color: #00f3ff; font-family: 'Courier New', Courier, monospace;
-            z-index: 10; font-size: 18px; font-weight: bold; text-shadow: 0 0 10px #00f3ff;
-            text-align: center;
-        }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-
-    <div class="status" id="status">WAITING FOR CAMERA...</div>
-    <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
     <script>
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-        const videoElement = document.getElementById("video");
-        const statusText = document.getElementById("status");
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        let width, height, particles = [];
+        const PINK = "#ff2d75"; // Warna Pink Neon Utama
+        const P_COUNT = 3000; // Jumlah partikel kotak agar teks padat
 
-        let particlesArray = [];
-        let handX = null;
-        let handY = null;
+        // Status Animasi: HEART -> EXPLOSION -> TEXT -> HEART
+        let state = "HEART"; 
 
-        // --- 1. FUNGSI UNTUK MENGGAMBAR PARTIKEL NEON ---
-        function drawNeon(x, y, size, color) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x, y, size, 0, Math.PI * 2);
-            
-            // Efek Cahaya (Glow)
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = color;
-            ctx.fillStyle = color;
-            ctx.fill();
-            
-            // Inti Lampu (Putih agar terlihat menyala)
-            ctx.beginPath();
-            ctx.arc(x, y, size * 0.4, 0, Math.PI * 2);
-            ctx.fillStyle = "#fff";
-            ctx.fill();
-            
-            ctx.restore();
+        const messages = [
+            "Hi, this is your secret admirer",
+            "I want you to know, I've admired you for a long time",
+            "sorry i said it this way",
+            "because I don't have the ability to say this to you directly"
+        ];
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
         }
 
-        // --- 2. LOGIKA PEMBENTUKAN TULISAN ---
-        function createTextPixels() {
-            ctx.fillStyle = "white";
-            const fontSize = Math.min(window.innerWidth * 0.15, 140);
-            ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText("I LOVE YOU", canvas.width / 2, canvas.height / 2);
-            
-            const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            return data;
-        }
-
-        // --- 3. CLASS PARTIKEL NEON ---
+        // --- CLASS PARTIKEL KOTAK (PIXEL) ---
         class Particle {
-            constructor(x, y) {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.destX = x;
-                this.destY = y;
-                
-                this.size = Math.random() * 3 + 2;
-                this.vx = 0;
-                this.vy = 0;
-                this.friction = 0.9;
-                this.springFactor = 0.15;
-
-                // Palet warna Neon
-                const colors = ['#00f3ff', '#ff00ff', '#00ff41', '#ffff00'];
-                this.color = colors[Math.floor(Math.random() * colors.length)];
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.destX = this.x;
+                this.destY = this.y;
+                // Properti untuk ledakan
+                this.velX = 0;
+                this.velY = 0;
+                this.friction = 0.96; // Gesekan agar melambat pelan-pelan
+                this.size = 2; // Ukuran kotak (pixel)
+                this.color = PINK;
+                this.speed = 0.07;
             }
-
-            draw() {
-                drawNeon(this.x, this.y, this.size, this.color);
-            }
-
             update() {
-                let dx = this.destX - this.x;
-                let dy = this.destY - this.y;
-                this.vx += dx * this.springFactor;
-                this.vy += dy * this.springFactor;
-                this.vx *= this.friction;
-                this.vy *= this.friction;
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Interaksi Tangan
-                if (handX != null && handY != null) {
-                    let hx = handX - this.x;
-                    let hy = handY - this.y;
-                    let dist = Math.sqrt(hx * hx + hy * hy);
-                    if (dist < 130) {
-                        let angle = Math.atan2(hy, hx);
-                        let force = (130 - dist) * 0.2; 
-                        this.vx -= Math.cos(angle) * force;
-                        this.vy -= Math.sin(angle) * force;
-                    }
+                if (state === "EXPLOSION") {
+                    // Logika Ledakan: Partikel menembak ke luar
+                    this.x += this.velX;
+                    this.y += this.velY;
+                    // Melambat secara bertahap
+                    this.velX *= this.friction;
+                    this.velY *= this.friction;
+                } else {
+                    // Pergerakan Easing normal menuju tujuan (Teks/Love)
+                    this.x += (this.destX - this.x) * this.speed;
+                    this.y += (this.destY - this.y) * this.speed;
                 }
+            }
+            draw() {
+                // Beri efek Neon Glow yang kuat
+                ctx.save();
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = PINK;
+                
+                // --- MENGGAMBAR KOTAK (PIXEL) ---
+                ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+                
+                ctx.restore();
             }
         }
 
-        function init() {
-            particlesArray = [];
-            const pixelData = createTextPixels();
-            const density = Math.min(window.innerWidth, window.innerHeight) > 1000 ? 12 : 10;
+        // --- AMBIL TITIK KOORDINAT (LOVE & TEKS) ---
+        function getHeartPoints() {
+            const pts = [];
+            const scale = Math.min(width, height) / 55;
+            for (let i = 0; i < P_COUNT; i++) {
+                const t = Math.random() * Math.PI * 2;
+                const r = Math.sqrt(Math.random());
+                const x = 16 * Math.pow(Math.sin(t), 3) * scale * r;
+                const y = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * scale * r;
+                pts.push({ x: width / 2 + x, y: height / 2.2 - y });
+            }
+            return pts;
+        }
 
-            for (let y = 0; y < pixelData.height; y += density) {
-                for (let x = 0; x < pixelData.width; x += density) {
-                    const index = (y * 4 * pixelData.width) + (x * 4) + 3;
-                    if (pixelData.data[index] > 128) {
-                        particlesArray.push(new Particle(x, y));
-                    }
+        function getTextPoints(text) {
+            const tCanvas = document.createElement('canvas');
+            const tCtx = tCanvas.getContext('2d', { willReadFrequently: true });
+            tCanvas.width = width; tCanvas.height = height;
+
+            const fSize = Math.min(width / 11, 35);
+            tCtx.font = `bold ${fSize}px sans-serif`;
+            tCtx.textAlign = 'center';
+            tCtx.textBaseline = 'middle';
+            tCtx.fillStyle = 'white';
+
+            const words = text.split(' ');
+            let line = '', lines = [];
+            const maxWidth = width * 0.85;
+
+            words.forEach(w => {
+                if (tCtx.measureText(line + w).width < maxWidth) line += w + ' ';
+                else { lines.push(line.trim()); line = w + ' '; }
+            });
+            lines.push(line.trim());
+            
+            const lineHeight = fSize * 1.6;
+            const totalHeight = lines.length * lineHeight;
+            let startY = (height / 2) - (totalHeight / 2) + (lineHeight / 2);
+
+            lines.forEach((l, i) => {
+                tCtx.fillText(l, width / 2, startY + (i * lineHeight));
+            });
+
+            const data = tCtx.getImageData(0, 0, width, height).data;
+            const pts = [];
+            // Scan pixel lebih rapat (step 2) agar teks tajam
+            for (let i = 0; i < data.length; i += 4 * 2) { 
+                if (data[i + 3] > 128) {
+                    const idx = i / 4;
+                    pts.push({ x: idx % width, y: Math.floor(idx / width) });
                 }
             }
+            return pts;
+        }
+
+        function setTargets(targetPoints, color) {
+            if (targetPoints.length === 0) return;
+            const shuffled = [...targetPoints].sort(() => Math.random() - 0.5);
+            for (let i = 0; i < P_COUNT; i++) {
+                const target = shuffled[i % shuffled.length];
+                particles[i].destX = target.x;
+                particles[i].destY = target.y;
+                particles[i].color = color;
+            }
+        }
+
+        let msgIdx = -1;
+        function flow() {
+            msgIdx++;
+            if (msgIdx < messages.length) {
+                const currentText = messages[msgIdx];
+                setTargets(getTextPoints(currentText), PINK); // Teks juga Pink Neon
+                
+                let d = 8500 + (currentText.split(' ').length * 600);
+                setTimeout(flow, d);
+            } else {
+                state = "HEART";
+                setTargets(getHeartPoints(), PINK);
+            }
+        }
+
+        // --- FUNGSI LEDAKAN SUPER ---
+        function shatters() {
+            state = "EXPLOSION";
+            particles.forEach(p => {
+                // Arah ledakan acak ke segala sisi
+                const angle = Math.random() * Math.PI * 2;
+                // Kekuatan ledakan sangat tinggi (5-25 pixel/frame)
+                const force = Math.random() * 20 + 5; 
+                p.velX = Math.cos(angle) * force;
+                p.velY = Math.sin(angle) * force;
+            });
+
+            // Kasih jeda waktu meledak selama 700ms sebelum berkumpul ke teks
+            setTimeout(() => {
+                state = "TEXT";
+                flow(); // Mulai teks pertama setelah meledak
+            }, 700); 
         }
 
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Efek Additive Blending (Penting untuk efek Neon)
-            ctx.globalCompositeOperation = 'lighter';
-            
-            for (let i = 0; i < particlesArray.length; i++) {
-                particlesArray[i].update();
-                particlesArray[i].draw();
-            }
-            
-            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, width, height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
             requestAnimationFrame(animate);
         }
 
-        // --- 4. SETUP AI HAND TRACKING ---
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
+        resize();
+        for (let i = 0; i < P_COUNT; i++) particles.push(new Particle());
+        
+        // Awal: Bentuk Love Pink Besar
+        setTargets(getHeartPoints(), PINK);
+        
+        // Jeda 5 detik di awal, lalu MELEDAK ke segala sisi
+        setTimeout(shatters, 5000); 
+        animate();
 
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6
-        });
-
-        hands.onResults((results) => {
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                statusText.style.display = 'none';
-                const indexFinger = results.multiHandLandmarks[0][8]; // Ujung telunjuk
-                handX = (1 - indexFinger.x) * canvas.width;
-                handY = indexFinger.y * canvas.height;
-            } else {
-                handX = null;
-                handY = null;
-                statusText.style.display = 'block';
-                statusText.innerText = "MOVE YOUR HAND IN FRONT OF CAMERA";
-            }
-        });
-
-        const camera = new Camera(videoElement, {
-            onFrame: async () => {
-                await hands.send({image: videoElement});
-            },
-            width: 640,
-            height: 480
-        });
-
-        camera.start().then(() => {
-            statusText.innerText = "CAMERA ACTIVE. LOADING AI...";
-            init();
-            animate();
-        });
-
-        window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            init();
-        });
+        window.addEventListener('resize', () => { location.reload(); });
     </script>
 </body>
 </html>
