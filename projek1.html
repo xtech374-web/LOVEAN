@@ -3,27 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Hand Tracking - Pink Neon Pixel Interactive</title>
+    <title>AI Hand Tracking - Optimized Pink Neon</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 2; }
         #video {
             position: absolute; bottom: 20px; right: 20px;
-            width: 150px; height: 110px;
-            border: 2px solid #ff2d75; border-radius: 8px;
-            z-index: 1; transform: scaleX(-1); opacity: 0.3;
-        }
-        .status {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            color: #ff2d75; font-family: 'Courier New', monospace;
-            z-index: 10; font-size: 16px; font-weight: bold;
-            text-shadow: 0 0 10px #ff2d75; text-align: center;
+            width: 120px; height: 90px;
+            border: 1px solid #ff2d75; border-radius: 8px;
+            z-index: 1; transform: scaleX(-1); opacity: 0.2;
         }
     </style>
 </head>
 <body>
-
-    <div class="status" id="status">WAITING FOR CAMERA...</div>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
@@ -32,13 +24,11 @@
 
     <script>
         const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d", { alpha: false }); // Optimasi konteks
         const videoElement = document.getElementById("video");
-        const statusText = document.getElementById("status");
 
         let width, height, particlesArray = [];
         let handX = null, handY = null;
-        let isExploded = false;
 
         function setCanvasSize() {
             width = canvas.width = window.innerWidth;
@@ -46,20 +36,9 @@
         }
         setCanvasSize();
 
-        function drawPixelNeon(x, y, size, color) {
-            ctx.save();
-            ctx.shadowBlur = 12;
-            ctx.shadowColor = color;
-            ctx.fillStyle = color;
-            ctx.fillRect(x - size/2, y - size/2, size, size);
-            ctx.fillStyle = "#fff";
-            ctx.fillRect(x - (size*0.4)/2, y - (size*0.4)/2, size*0.4, size*0.4);
-            ctx.restore();
-        }
-
         function createTextPixels() {
             ctx.fillStyle = "white";
-            const fontSize = Math.min(width * 0.15, 130);
+            const fontSize = Math.min(width * 0.12, 110);
             ctx.font = `bold ${fontSize}px Arial`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
@@ -71,24 +50,18 @@
 
         class Particle {
             constructor(x, y) {
-                this.x = width / 2;
-                this.y = height / 2;
+                this.x = width / 2 + (Math.random() - 0.5) * 100;
+                this.y = height / 2 + (Math.random() - 0.5) * 100;
                 this.destX = x;
                 this.destY = y;
-                this.size = Math.random() * 3 + 3;
-                
-                // Vektor Ledakan Awal
-                const angle = Math.random() * Math.PI * 2;
-                const force = Math.random() * 30 + 10;
-                this.vx = Math.cos(angle) * force;
-                this.vy = Math.sin(angle) * force;
-                
-                this.friction = 0.95;
-                this.spring = 0.08;
+                this.size = 3;
+                this.vx = (Math.random() - 0.5) * 20;
+                this.vy = (Math.random() - 0.5) * 20;
+                this.friction = 0.92;
+                this.spring = 0.06;
             }
 
             update() {
-                // Selalu terapkan gaya kembali ke tujuan (kecuali saat awal meledak)
                 let dx = this.destX - this.x;
                 let dy = this.destY - this.y;
                 
@@ -97,35 +70,39 @@
                 this.vx *= this.friction;
                 this.vy *= this.friction;
 
-                // --- LOGIKA INTERAKTIF (WAJIB ADA) ---
                 if (handX !== null && handY !== null) {
                     let hx = handX - this.x;
                     let hy = handY - this.y;
-                    let dist = Math.sqrt(hx * hx + hy * hy);
-                    if (dist < 150) { // Radius interaksi diperbesar
+                    let distSq = hx * hx + hy * hy; // Gunakan kuadrat agar lebih cepat
+                    if (distSq < 14400) { // 120 * 120
+                        let dist = Math.sqrt(distSq);
                         let angle = Math.atan2(hy, hx);
-                        let push = (150 - dist) * 0.5; // Kekuatan dorong ditingkatkan
+                        let push = (120 - dist) * 0.4;
                         this.vx -= Math.cos(angle) * push;
                         this.vy -= Math.sin(angle) * push;
                     }
                 }
-
                 this.x += this.vx;
                 this.y += this.vy;
             }
 
             draw() {
-                drawPixelNeon(this.x, this.y, this.size, "#ff2d75");
+                // Gambar tanpa shadowBlur berat untuk tiap partikel
+                ctx.fillStyle = "#ff2d75";
+                ctx.fillRect(this.x - 1.5, this.y - 1.5, 3, 3);
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(this.x - 0.5, this.y - 0.5, 1, 1);
             }
         }
 
         function init() {
             particlesArray = [];
             const pixelData = createTextPixels();
-            for (let y = 0; y < pixelData.height; y += 10) {
-                for (let x = 0; x < pixelData.width; x += 10) {
-                    const index = (y * 4 * pixelData.width) + (x * 4) + 3;
-                    if (pixelData.data[index] > 128) {
+            // Density dinaikkan ke 12 agar jumlah partikel berkurang (lebih enteng)
+            const density = 12; 
+            for (let y = 0; y < pixelData.height; y += density) {
+                for (let x = 0; x < pixelData.width; x += density) {
+                    if (pixelData.data[(y * 4 * pixelData.width) + (x * 4) + 3] > 128) {
                         particlesArray.push(new Particle(x, y));
                     }
                 }
@@ -133,15 +110,17 @@
         }
 
         function animate() {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.3)"; 
+            ctx.fillStyle = "black";
             ctx.fillRect(0, 0, width, height);
             
-            ctx.globalCompositeOperation = 'lighter';
+            // Pindahkan shadowBlur ke level canvas (global) agar lebih ringan
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "#ff2d75";
+
             for (let i = 0; i < particlesArray.length; i++) {
                 particlesArray[i].update();
                 particlesArray[i].draw();
             }
-            ctx.globalCompositeOperation = 'source-over';
             requestAnimationFrame(animate);
         }
 
@@ -149,29 +128,24 @@
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
 
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5 });
 
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                statusText.style.display = 'none';
                 const finger = results.multiHandLandmarks[0][8]; 
-                // Koordinat harus dikalibrasi dengan benar agar interaktif
                 handX = (1 - finger.x) * width;
                 handY = finger.y * height;
             } else {
                 handX = null; handY = null;
-                statusText.style.display = 'block';
-                statusText.innerText = "MOVE YOUR HAND";
             }
         });
 
         const camera = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 640, height: 480
+            width: 480, height: 360 // Resolusi kamera lebih kecil agar enteng
         });
 
         camera.start().then(() => {
-            statusText.innerText = "READY!";
             init();
             animate();
         });
