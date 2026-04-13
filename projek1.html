@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tit</title>
+    <title>Neon Pixel Final - Smooth & Dense</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 2; }
         #video {
-            position: absolute; bottom: 15px; right: 15px;
-            width: 100px; height: 75px;
-            border: 1px solid #ff2d75; border-radius: 5px;
+            position: absolute; bottom: 10px; right: 10px;
+            width: 80px; height: 60px;
+            border: 1px solid #ff2d75; border-radius: 4px;
             z-index: 1; transform: scaleX(-1); opacity: 0.1;
         }
     </style>
@@ -24,7 +24,7 @@
 
     <script>
         const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d", { alpha: false }); // Optimasi: Matikan alpha channel
+        const ctx = canvas.getContext("2d", { alpha: false });
         const videoElement = document.getElementById("video");
 
         let width, height, particlesArray = [];
@@ -37,13 +37,13 @@
         setCanvasSize();
 
         function createTextPixels() {
-            ctx.fillStyle = "white";
-            // Font diperkecil sedikit agar lebih tajam di layar HP
-            const fontSize = Math.min(width * 0.14, 110);
-            ctx.font = `bold ${fontSize}px sans-serif`;
+            // Gunakan font yang lebih tebal agar partikel lebih kumpul
+            const fontSize = Math.min(width * 0.15, 120);
+            ctx.font = `900 ${fontSize}px sans-serif`;
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText("JANGAN SENTUH AKU MASSSS", width / 2, height / 2);
+            ctx.fillStyle = "white";
+            ctx.fillText("I LOVE YOU", width / 2, height / 2);
             const data = ctx.getImageData(0, 0, width, height);
             ctx.clearRect(0, 0, width, height);
             return data;
@@ -55,10 +55,10 @@
                 this.y = Math.random() * height;
                 this.destX = x;
                 this.destY = y;
-                this.vx = (Math.random() - 0.5) * 10;
-                this.vy = (Math.random() - 0.5) * 10;
-                this.accel = 0.08;
-                this.friction = 0.88;
+                this.vx = 0;
+                this.vy = 0;
+                this.accel = 0.05;
+                this.friction = 0.85;
             }
 
             update() {
@@ -74,9 +74,9 @@
                     let hx = handX - this.x;
                     let hy = handY - this.y;
                     let distSq = hx * hx + hy * hy;
-                    if (distSq < 9000) { // Radius 95px
+                    if (distSq < 8100) { // Radius 90px
                         let dist = Math.sqrt(distSq);
-                        let force = (95 - dist) * 0.8;
+                        let force = (90 - dist) * 0.5;
                         this.vx -= (hx / dist) * force;
                         this.vy -= (hy / dist) * force;
                     }
@@ -86,10 +86,14 @@
             }
 
             draw() {
-                // Gambar pixel pink neon
+                // Efek Neon tanpa Shadow (Layered Rect)
+                // Lapis 1: Aura Pink Luar (lebih besar)
+                ctx.fillStyle = "rgba(255, 45, 117, 0.5)";
+                ctx.fillRect(this.x - 2, this.y - 2, 4, 4);
+                // Lapis 2: Inti Pink Terang
                 ctx.fillStyle = "#ff2d75";
-                ctx.fillRect(this.x - 1, this.y - 1, 2.5, 2.5);
-                // Inti putih kecil
+                ctx.fillRect(this.x - 1, this.y - 1, 2, 2);
+                // Lapis 3: Titik Putih Tengah
                 ctx.fillStyle = "#ffffff";
                 ctx.fillRect(this.x - 0.5, this.y - 0.5, 1, 1);
             }
@@ -98,12 +102,10 @@
         function init() {
             particlesArray = [];
             const pixelData = createTextPixels();
-            // Density diturunkan ke 7 agar partikel jauh lebih Rapat/Padat
-            const density = 7; 
+            const density = 8; // Angka paling aman untuk kepadatan vs performa
             for (let y = 0; y < pixelData.height; y += density) {
                 for (let x = 0; x < pixelData.width; x += density) {
-                    const index = (y * 4 * pixelData.width) + (x * 4) + 3;
-                    if (pixelData.data[index] > 128) {
+                    if (pixelData.data[(y * 4 * pixelData.width) + (x * 4) + 3] > 128) {
                         particlesArray.push(new Particle(x, y));
                     }
                 }
@@ -111,13 +113,8 @@
         }
 
         function animate() {
-            // Gunakan fillRect hitam pekat daripada clearRect untuk performa GPU
             ctx.fillStyle = "#000";
             ctx.fillRect(0, 0, width, height);
-            
-            // Efek Neon Glow Global (Cukup satu kali set)
-            ctx.shadowBlur = 8;
-            ctx.shadowColor = "#ff2d75";
 
             for (let i = 0; i < particlesArray.length; i++) {
                 particlesArray[i].update();
@@ -133,8 +130,7 @@
         hands.setOptions({ 
             maxNumHands: 1, 
             modelComplexity: 0, 
-            minDetectionConfidence: 0.5, 
-            minTrackingConfidence: 0.5 
+            minDetectionConfidence: 0.5 
         });
 
         hands.onResults((results) => {
