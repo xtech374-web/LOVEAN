@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Pixel - Jangan Sentuh Aku</title>
+    <title>Interactive Neon Pixel - Fixed</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         canvas { display: block; position: absolute; top: 0; left: 0; z-index: 2; }
-        #video { position: absolute; bottom: 10px; right: 10px; width: 60px; opacity: 0; transform: scaleX(-1); }
+        #video { position: absolute; bottom: 10px; right: 10px; width: 100px; border: 1px solid #ff2d75; opacity: 0.3; transform: scaleX(-1); z-index: 1; }
+        .status {
+            position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+            color: #ff2d75; font-family: monospace; z-index: 10; font-size: 14px;
+        }
     </style>
 </head>
 <body>
+    <div class="status" id="status">MEMUAT KAMERA...</div>
     <video id="video" autoplay playsinline></video>
     <canvas id="canvas"></canvas>
 
@@ -21,10 +26,12 @@
         const canvas = document.getElementById("canvas");
         const ctx = canvas.getContext("2d");
         const videoElement = document.getElementById("video");
+        const statusText = document.getElementById("status");
 
         let width, height, particles = [];
         let handX = null, handY = null;
 
+        // Pre-render pixel untuk performa
         const pCanvas = document.createElement('canvas');
         const pCtx = pCanvas.getContext('2d');
         pCanvas.width = 6; pCanvas.height = 6;
@@ -47,24 +54,31 @@
                 this.y = Math.random() * height;
                 this.vx = 0;
                 this.vy = 0;
-                this.friction = 0.85;
-                this.ease = 0.08;
+                this.friction = 0.8; // Membuat gerakan lebih terkendali
+                this.ease = 0.05;    // Kecepatan kembali ke teks
             }
 
             update() {
-                if (handX !== null) {
-                    let dx = handX - this.x;
-                    let dy = handY - this.y;
+                // LOGIKA INTERAKTIF UTAMA
+                if (handX !== null && handY !== null) {
+                    let dx = this.x - handX;
+                    let dy = this.y - handY;
                     let distSq = dx * dx + dy * dy;
-                    if (distSq < 7000) { 
+                    let radius = 100; // Jarak interaksi tangan (100px)
+                    
+                    if (distSq < radius * radius) {
                         let dist = Math.sqrt(distSq);
-                        let force = (85 - dist) * 0.4;
-                        this.vx -= (dx / dist) * force;
-                        this.vy -= (dy / dist) * force;
+                        let force = (radius - dist) / radius;
+                        // Dorong partikel menjauh dari tangan
+                        this.vx += (dx / dist) * force * 15;
+                        this.vy += (dy / dist) * force * 15;
                     }
                 }
+
+                // Kembali ke posisi teks
                 this.vx += (this.destX - this.x) * this.ease;
                 this.vy += (this.destY - this.y) * this.ease;
+                
                 this.vx *= this.friction;
                 this.vy *= this.friction;
                 this.x += this.vx;
@@ -83,24 +97,21 @@
             tempCanvas.width = width;
             tempCanvas.height = height;
 
-            // Ukuran font disesuaikan karena teks lebih panjang
             const fontSize = Math.min(width * 0.1, 70); 
             tempCtx.font = `900 ${fontSize}px Arial`;
             tempCtx.textAlign = "center";
             tempCtx.textBaseline = "middle";
             tempCtx.fillStyle = "white";
             
-            // Menggambar teks baru
             tempCtx.fillText("JANGAN SENTUH", width / 2, height / 2 - (fontSize / 1.5));
             tempCtx.fillText("AKU MASS", width / 2, height / 2 + (fontSize / 1.5));
 
             const data = tempCtx.getImageData(0, 0, width, height).data;
-            const gap = 7; 
+            const gap = 8; 
 
             for (let y = 0; y < height; y += gap) {
                 for (let x = 0; x < width; x += gap) {
-                    const index = (y * width + x) * 4 + 3;
-                    if (data[index] > 128) {
+                    if (data[((y * width) + x) * 4 + 3] > 128) {
                         particles.push(new Particle(x, y));
                     }
                 }
@@ -121,21 +132,35 @@
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
 
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5 });
+        hands.setOptions({ 
+            maxNumHands: 1, 
+            modelComplexity: 0, 
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5 
+        });
+
         hands.onResults(res => {
-            if (res.multiHandLandmarks && res.multiHandLandmarks[0]) {
-                const pt = res.multiHandLandmarks[0][8];
+            if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                statusText.innerText = "TANGAN TERDETEKSI";
+                const pt = res.multiHandLandmarks[0][8]; // Ujung jari telunjuk
                 handX = (1 - pt.x) * width;
                 handY = pt.y * height;
-            } else { handX = null; }
+            } else {
+                statusText.innerText = "GERAKKAN TANGANMU";
+                handX = null;
+                handY = null;
+            }
         });
 
         const camera = new Camera(videoElement, {
-            onFrame: async () => await hands.send({image: videoElement}),
-            width: 256, height: 144
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 480, height: 360 // Resolusi standar agar stabil
         });
 
         camera.start().then(() => {
+            statusText.innerText = "SISTEM SIAP";
             resize();
             animate();
         });
